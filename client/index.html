@@ -88,21 +88,10 @@
         let playerWins = document.getElementById("playerWins")
         let infocard = document.getElementById("infocard")
         let _wins
-        let chat = document.getElementById('chatInput')
-        let autoFill = document.getElementById('autofill')
-        let connect = document.getElementById('count');
 
         document.getElementById("info").onclick = function() {
             infocard.classList.toggle('infoactive')
         }
-
-        socket.on('connectCnt', function(rdy, cnt) {
-            connect.innerHTML = rdy + " / " + cnt + " ready";
-        });
-
-        socket.on('readyCnt', function(rdy, cnt) {
-            connect.innerHTML = rdy + " / " + cnt + " ready";
-        });
 
         // Send Username and Password to the Server for signing up and signing in
         signIn.onclick = function () {
@@ -116,64 +105,8 @@
             socket.emit('removeAct', {Usr: user.value, Pas: pass.value});
         }
 
-        const debounce = (func, delay) => { 
-            let debounceTimer 
-            return function() { 
-                const context = this
-                const args = arguments 
-                clearTimeout(debounceTimer) 
-                debounceTimer = setTimeout(() => func.apply(context, args), delay) 
-            } 
-        }  
-
-        const inputHandler = function(e) {
-            socket.emit('autofill', e);
-        }
-
-        socket.on('autofillres', function(data) {
-            closeSuggestions();
-            let oldContainer = document.getElementsByClassName('autofillitems');
-            if (typeof(oldContainer) != 'undefined' && oldContainer != null)
-                autoFill.removeChild[oldContainer];
-
-            let autoFillContainer = document.createElement('div');
-            autoFillContainer.className = 'autofillitems';
-            autoFill.append(autoFillContainer);
-
-            let count = 0;
-            data.forEach(function(elem) {
-                if (count < 8) {
-                    let suggest = document.createElement('div');
-                    suggest.innerHTML = elem;
-
-                    suggest.addEventListener("click", function(e) {
-                        chat.value = elem;
-                        closeSuggestions(chat.vlue);
-                    });
-                    autoFillContainer.append(suggest);
-                }
-                count++;
-            })
-        })
-
-        function closeSuggestions(elmnt) {
-            var x = document.getElementsByClassName("autofillitems");
-            for (var i = 0; i < x.length; i++) {
-                if (elmnt != x[i]) {
-                    x[i].parentNode.removeChild(x[i]);
-                }
-            }
-        }
-
-        chat.addEventListener('input', debounce(function() {
-            if (chat.value.substring(0,1) == '@') {
-                inputHandler(chat.value.substring(1, chat.length));
-            }
-        }, 200));
-
         document.getElementById('readyButton').onclick = function () {
             document.getElementById('readyButton').style.display = 'none';
-            closeSuggestions();
             socket.emit('readyUp');
         }
 
@@ -242,11 +175,7 @@
             playerWins.innerHTML = name + " Wins: " + _wins
         })
 
-        socket.on('gameEnd', function() {
-            let val = 0 + " ";
-            val += connect.innerHTML.substring(2,connect.innerHTML.length)
-            connect.innerHTML = val;
-        })
+
 
         // Game Page Elements
         var canvas = document.getElementById("canv");
