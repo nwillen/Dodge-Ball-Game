@@ -1,0 +1,399 @@
+<head>
+    <link rel="stylesheet" href="client/style.css">
+    <title>DodgeBall</title>
+</head>
+
+<body>
+    <button id = "info">🛈</button>
+    <div id= "infocard" >
+        Welcome to dodgeball. Avoid the black circles. Collect stars for abilities. Blue stars let you click to teleport.
+        Purple stars let you kill all black circles around you. Last alive wins!
+    </div>
+    <div id="login">
+        <label for="inputUser">Username</label>
+        <input id="inputUser" type="text"> </input> <br>
+        <label for="inputPass">Password</label>
+        <input id="inputPass" type = text> </input> <br>
+        <button id="signIn"> Sign In </button>
+        <button id="signUp"> Sign Up </button>
+        <br>
+        <button id="removeAct"> Delete Account</button>
+        <br>
+        <label for="colors">Pick a color: </label>
+        <select name="colors" id="colors" style='width: 100px'></select>
+        <p id='sucsignup' style='color: #208020; display: none; margin-bottom: -5px'>Successfully created<br>account, Log in.</p>
+        <p id='failsignup' style='color: red; display: none; margin-bottom: -5px'>Error creating account, <br>Try again later.</p>
+        <p id='failsignin' style='color: red; display: none; margin-bottom: -5px'>Error signing in, <br>Try creating an account first.</p>
+        <p id='delacct' style='color: #ffa500; display: none; margin-bottom: -5px'>Account deleted.</p>
+        <p id='faildelacct' style='color: #ffa500; display: none; margin-bottom: -5px'>Account does<br>not exist.</p>
+    </div>
+
+    <div id="game" style="display:none">
+        <div id="playerWins"></div>
+        <div id=wrapper>
+            <div id=gameContainer>
+                <div id="chatText" style="width:150px;height:499.5px;overflow-y:scroll;"></div>
+                <canvas id ="canv" style='border:1px solid #000000;'></canvas>
+                <span id='count'></span>
+                <button id="readyButton">
+                    Ready
+                </button>
+            </div>
+    
+            <form id = "chatForm">
+                <div id='autofill'>
+                    <input id="chatInput" type="text" style="width:906px"></input> 
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/socket.io-3.0.1.min.js"></script>
+
+    <script>
+        var socket = io();
+
+        // Update color selection
+        socket.on('updateColors', function (data, chosenClrs) {
+            for (var p in data) {
+                var player = data[p];
+                chosenClrs.push(player.color);
+            }
+            let colorSelection = document.getElementById('colors');
+            let colorList = ['red', 'orange', 'yellow', 'green', 'cyan', 'aquamarine', 'purple', 'violet'];
+            for (let i = 0; i < 8; i++) {
+                if (!chosenClrs.includes(colorList[i])) {
+                    let colorOption = document.createElement('option');
+                    colorOption.value = colorList[i];
+                    colorOption.innerText = colorList[i];
+                    colorOption.id = colorList[i];
+                    colorSelection.append(colorOption);
+                }
+            }
+        })
+
+        // The Sign-In Page Elements
+        let login = document.getElementById("login")
+        let game = document.getElementById("game")
+        let user = document.getElementById("inputUser")
+        let pass = document.getElementById("inputPass")
+        let signIn = document.getElementById("signIn")
+        let signUp = document.getElementById("signUp")
+        let sucSignUp = document.getElementById('sucsignup') // success msg
+        let failSignUp = document.getElementById('failsignup') // fail msg
+        let delacct = document.getElementById('delacct') // del msg
+        let removeAct = document.getElementById("removeAct")
+        let failSignIn = document.getElementById("failsignin")
+        let faildelacct = document.getElementById('faildelacct')
+        let playerWins = document.getElementById("playerWins")
+        let infocard = document.getElementById("infocard")
+        let _wins
+        let chat = document.getElementById('chatInput')
+        let autoFill = document.getElementById('autofill')
+        let connect = document.getElementById('count');
+
+        document.getElementById("info").onclick = function() {
+            infocard.classList.toggle('infoactive')
+        }
+
+        socket.on('connectCnt', function(rdy, cnt) {
+            connect.innerHTML = rdy + " / " + cnt + " ready";
+        });
+
+        socket.on('readyCnt', function(rdy, cnt) {
+            connect.innerHTML = rdy + " / " + cnt + " ready";
+        });
+
+        // Send Username and Password to the Server for signing up and signing in
+        signIn.onclick = function () {
+            let color = document.getElementById('colors').value;
+            socket.emit('signIn', { Usr: user.value, Pas: pass.value }, color);
+        }
+        signUp.onclick = function (e) {
+            socket.emit('signUp', { Usr: user.value, Pas: pass.value });
+        }
+        removeAct.onclick = function(e) {
+            socket.emit('removeAct', {Usr: user.value, Pas: pass.value});
+        }
+
+        const debounce = (func, delay) => { 
+            let debounceTimer 
+            return function() { 
+                const context = this
+                const args = arguments 
+                clearTimeout(debounceTimer) 
+                debounceTimer = setTimeout(() => func.apply(context, args), delay) 
+            } 
+        }  
+
+        const inputHandler = function(e) {
+            socket.emit('autofill', e);
+        }
+
+        socket.on('autofillres', function(data) {
+            closeSuggestions();
+            let oldContainer = document.getElementsByClassName('autofillitems');
+            if (typeof(oldContainer) != 'undefined' && oldContainer != null)
+                autoFill.removeChild[oldContainer];
+
+            let autoFillContainer = document.createElement('div');
+            autoFillContainer.className = 'autofillitems';
+            autoFill.append(autoFillContainer);
+
+            let count = 0;
+            data.forEach(function(elem) {
+                if (count < 8) {
+                    let suggest = document.createElement('div');
+                    suggest.innerHTML = elem;
+
+                    suggest.addEventListener("click", function(e) {
+                        chat.value = elem;
+                        closeSuggestions(chat.vlue);
+                    });
+                    autoFillContainer.append(suggest);
+                }
+                count++;
+            })
+        })
+
+        function closeSuggestions(elmnt) {
+            var x = document.getElementsByClassName("autofillitems");
+            for (var i = 0; i < x.length; i++) {
+                if (elmnt != x[i]) {
+                    x[i].parentNode.removeChild(x[i]);
+                }
+            }
+        }
+
+        chat.addEventListener('input', debounce(function() {
+            if (chat.value.substring(0,1) == '@') {
+                inputHandler(chat.value.substring(1, chat.length));
+            }
+        }, 200));
+
+        document.getElementById('readyButton').onclick = function () {
+            document.getElementById('readyButton').style.display = 'none';
+            closeSuggestions();
+            socket.emit('readyUp');
+        }
+
+        // If the user and pass are correct then show game page, else do nothing
+        socket.on('signInRes', function (data, player, playerList) {
+            if (data.result) {
+                login.style.display = "none";
+                game.style.display = "inline-block";
+                for (var x in playerList) {
+                    var p = playerList[x]
+                    if (player.color == p.color && player.id != p.id) {
+                        login.style.display = "inline";
+                        game.style.display = "none";
+                        alert("Color already chosen");
+                        document.getElementById(player.color).remove();
+                    }
+                }
+            } else {
+                sucSignUp.style.display = 'none';
+                failSignUp.style.display = 'none';
+                delacct.style.display = 'none';
+                failSignIn.style.display = 'block';
+                faildelacct.style.display = 'none'
+            }
+        })
+
+        socket.on('signUpRes', function (data) {
+            if (data.result) {
+                failSignUp.style.display = 'none';
+                delacct.style.display = 'none';
+                faildelacct.style.display = 'none'
+                failSignIn.style.display = 'none';
+                sucSignUp.style.display ='block';
+            } else {
+                sucSignUp.style.display = 'none';
+                delacct.style.display = 'none';
+                failSignIn.style.display = 'none';
+                failSignUp.style.display ='block';
+                faildelacct.style.display = 'none'
+            }
+        })
+        
+        socket.on('removeActRes', function (result) {
+            if (result) {
+                sucSignUp.style.display = 'none';
+                failSignUp.style.display = 'none';
+                failSignIn.style.display = 'none';
+                delacct.style.display = 'block';
+                faildelacct.style.display = 'none'
+            } else {
+                sucSignUp.style.display = 'none';
+                delacct.style.display = 'none';
+                failSignIn.style.display = 'none';
+                failSignUp.style.display ='none';
+                faildelacct.style.display = 'block'
+            }
+        })
+
+        socket.on('newWins', function(name, wins){
+            _wins = wins
+            playerWins.innerHTML = name + " Wins: " + _wins
+        })
+
+        socket.on('oneWin', function(name){
+            _wins++
+            playerWins.innerHTML = name + " Wins: " + _wins
+        })
+
+        socket.on('gameEnd', function() {
+            let val = 0 + " ";
+            val += connect.innerHTML.substring(2,connect.innerHTML.length)
+            connect.innerHTML = val;
+        })
+
+        // Game Page Elements
+        var canvas = document.getElementById("canv");
+        var ctx = canvas.getContext("2d");
+        ctx.font = "30px Arial";
+
+        // set canvas size
+        canvas.width = 750;
+        canvas.height = 500;
+
+        let chatText = document.getElementById("chatText");
+        let chatInput = document.getElementById("chatInput");
+        let chatForm = document.getElementById("chatForm");
+
+        // When the server tells the client to add message, client adds to the chat and and clears the chat box
+        socket.on('addToChat', function (color, data) {
+            chatInput.value = "";
+            chatText.innerHTML += '<div class="msg" style="opacity:1; background-color: ' + color + '">' + data + '</div>';
+            if (data.substring(0,9) == 'Game Over' ) {
+                document.getElementById('readyButton').style.display = 'inline-block';
+            }
+        })
+
+
+
+        // Start chat messages with '.' to evalate something. Ex: .Users would result in printing the Users online
+        chatForm.onsubmit = function (event) {
+            event.preventDefault()
+            if (chatInput.value != '') {
+                socket.emit('msgServ', chatInput.value);
+            }
+        }
+
+        //Detect if the mouse is over the canvas
+        let mouseInCanv = false
+        document.onmousemove = function (event) {
+            let cv = canvas.getBoundingClientRect();
+            let x = event.clientX - cv.left;
+            let y = event.clientY - cv.top;
+            if (x >= 0 && x <= 750 && y >= 0 && y <= 500) {
+                mouseInCanv = true;
+            } else {
+                mouseInCanv = false;
+            }
+        }
+
+        canvas.onclick = function (event) {
+            if (mouseInCanv) {
+                socket.emit('canvasClick',event.clientX - canvas.getBoundingClientRect().left,event.clientY - canvas.getBoundingClientRect().top);
+            }
+        }
+
+        //When the server sends new positions to the client, it will repaint the canvas with new positions
+        socket.on('newPostions', function (data) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < data.players.length; i++) {
+                ctx.beginPath();
+                ctx.arc(data.players[i].x, data.players[i].y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = data.players[i].color;
+                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "black";
+                ctx.stroke();
+                if(data.players[i].powerUp == 'barrier') {
+                    ctx.beginPath();
+                    ctx.arc(data.players[i].x, data.players[i].y, 100, 0, 2 * Math.PI);
+                    ctx.stroke();
+                } 
+
+                ctx.fillStyle = "black";
+                ctx.textAlign = "center";
+                ctx.fillText(data.players[i].name, data.players[i].x, data.players[i].y - 15)
+            }
+
+            for (var i = 0; i < data.bullets.length; i++) {
+                ctx.beginPath();
+                ctx.arc(data.bullets[i].x, data.bullets[i].y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = "black";
+                ctx.fill();
+            }
+
+            for (var i = 0; i < data.powerUps.length; i++) {
+                if (data.powerUps[i].type == 'barrier') {
+                    drawStar(data.powerUps[i].x, data.powerUps[i].y, 5, 10, 5, 'purple');
+                }
+                if (data.powerUps[i].type == 'blink') {
+                    drawStar(data.powerUps[i].x, data.powerUps[i].y, 5, 10, 5, 'blue');
+                }
+            }
+
+            function drawStar(cx, cy, spikes, outerRadius, innerRadius, color) {
+                var rot = Math.PI / 2 * 3;
+                var x = cx;
+                var y = cy;
+                var step = Math.PI / spikes;
+
+                ctx.strokeStyle = "#000";
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - outerRadius)
+                for (let i = 0; i < spikes; i++) {
+                    x = cx + Math.cos(rot) * outerRadius;
+                    y = cy + Math.sin(rot) * outerRadius;
+                    ctx.lineTo(x, y)
+                    rot += step
+
+                    x = cx + Math.cos(rot) * innerRadius;
+                    y = cy + Math.sin(rot) * innerRadius;
+                    ctx.lineTo(x, y)
+                    rot += step
+                }
+                ctx.lineTo(cx, cy - outerRadius);
+                ctx.closePath();
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = color;
+                ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+        })
+
+        //Tell server when someone presses WASD
+        document.onkeydown = function (event) {
+            if (event.keyCode == 68) {
+                socket.emit('keyPress', { InputId: 'right', state: true })
+            } else if (event.keyCode == 87) {
+                socket.emit('keyPress', { InputId: 'down', state: true })
+            } else if (event.keyCode == 65) {
+                socket.emit('keyPress', { InputId: 'left', state: true })
+            } else if (event.keyCode == 83) {
+                socket.emit('keyPress', { InputId: 'up', state: true })
+            } else if (event.keyCode == 32) {
+                socket.emit('keyPress', { InputId: 'space', state: true })
+            }
+        }
+
+        document.onkeyup = function (event) {
+            if (event.keyCode == 68) {
+                socket.emit('keyPress', { InputId: 'right', state: false })
+            } else if (event.keyCode == 87) {
+                socket.emit('keyPress', { InputId: 'down', state: false })
+            } else if (event.keyCode == 65) {
+                socket.emit('keyPress', { InputId: 'left', state: false })
+            } else if (event.keyCode == 83) {
+                socket.emit('keyPress', { InputId: 'up', state: false })
+            } else if (event.keyCode == 32) {
+                socket.emit('keyPress', { InputId: 'space', state: false })
+            }
+        }
+    </script>
+</body>
